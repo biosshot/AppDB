@@ -1,184 +1,218 @@
-# InDB
 
-**InDB** is a lightweight embedded database for JavaScript that runs in the browser. It uses **IndexedDB** for persistent storage and provides an API similar to **MongoDB** / **NeDB**. The library supports execution in both the main thread and Web Workers for non-blocking operations.
+# AppDB
+
+**AppDB** is a lightweight embedded database for JavaScript applications running in the browser, built on top of **IndexedDB**. It provides an API similar to **NeDB** and **MongoDB**, making it easy to learn for developers familiar with these tools.
+
+AppDB supports execution in both the **main thread** and **Web Workers**, allowing heavy database operations to be performed without blocking the user interface.
 
 ## Features
 
-*   **Storage:** Uses IndexedDB for persistent client-side storage.
-*   **MongoDB-like API:** Familiar methods such as `insert`, `find`, `update`, `remove`.
-*   **Web Worker Support:** Can offload operations to a Web Worker to avoid blocking the UI (internal Blob worker, no external file needed).
-*   **Caching:** Built-in result caching mechanism for faster queries.
-*   **Automatic Fields:** Automatically generates `_id` (ObjectId style) and `timestamp`.
-*   **Indexing:** Automatic index creation and management based on initialization schema.
-*   **Flexibility:** Supports both Callbacks and Promises.
-*   **Operators:** Supports update operators (`$set`, `$addToSet`, `$pull`) and query operators (`$or`, `$in`, `$bound`).
+* **IndexedDB Backend:** Reliable client-side storage supporting large volumes of data.
+* **NeDB/MongoDB-style API:** Methods include `insert`, `find`, `update`, `remove`.
+* **Web Worker Support:** Offload database operations to a separate thread for better performance.
+* **Automatic Indexing:** Indexes are created dynamically based on used keys.
+* **Caching:** Built-in caching layer to speed up frequent queries.
+* **Flexible Queries:** Supports operators like `$set`, `$addToSet`, `$pull`, `$or`, `$in`, `$bound`, etc.
+* **Asynchronous:** Full support for Callbacks and Promises.
+* **ID Generation:** Automatic unique identifier (`_id`) generation.
 
 ## Installation
 
-Include the library via a `<script>` tag or import it as a module.
+Include the `AppDB.js` file in your project:
 
 ```html
-<script src="InDB-1.1.6.js"></script>
+<script src="AppDB.js"></script>
 ```
 
-Or via ES6 import (if using a bundler):
+Or import as a module (depending on your build setup):
 
 ```javascript
-import InDBClient from './InDB-1.1.6.js';
+import AppDBClient from './AppDB.js';
 ```
 
 ## Quick Start
 
 ### Initialization
 
-Create a client instance and initialize the database with store definitions and indexes.
+To get started, initialize the database by defining store names and their indexes.
 
 ```javascript
-// Param 1: useWorker (true/false) - Enable Web Worker
-// Param 2: buffer - Array of store names to buffer
-// Param 3: cachelock - Array of store names to disable caching
-const InDB = new InDBClient(false, [], []);
+// Initialize client (false = main thread, [] = buffer stores, [] = cache locked stores)
+const AppDB = new AppDBClient(false, [], []); 
 
-// Initialize DB
-// dbName: Database name
-// stores: Object { storeName: [indexes] }
-const db = InDB.init('MyApplicationDB', {
-    projects: ['mission', 'timestamp', 'status'],
-    users: ['email', 'role']
-}, (err, database, upgrade, isWorker) => {
+const db = AppDB.init('MyDatabase', {
+    projects: ['mission', 'project', 'timestamp'],
+    missions: ['status', 'timestamp'],
+    users: ['email']
+}, function (error, database, upgrade, isWorker) {
+    if (error) return console.error(error);
+    console.log('Database initialized');
+  
+    // Example insert
+    db.projects.insert({
+        mission: 'bla1',
+        project: 'super1',
+        status: 'active'
+    }, function (err, newDoc) {
+        console.log('Document added:', newDoc);
+    });
+});
+```
+
+### Basic Operations (CRUD)
+
+#### Insert
+
+```javascript
+db.projects.insert({ name: 'New Project', value: 100 }, function (err, doc) {
     if (err) return console.error(err);
-    console.log('DB initialized', isWorker ? 'in Worker' : 'in Main Thread');
+    console.log('Document ID:', doc._id);
 });
 ```
 
-### Insert
+#### Find
 
 ```javascript
-db.projects.insert({
-    mission: 'alpha',
-    project: 'website',
-    status: 'active'
-}, (err, newDoc) => {
-    console.log('Inserted:', newDoc);
-    // newDoc will contain _id and timestamp
-});
-```
-
-### Find
-
-```javascript
-// Find all projects with mission 'alpha'
-db.projects.find({ mission: 'alpha' }, (err, docs) => {
-    console.log('Found:', docs);
+// Find all projects with mission 'bla1'
+db.projects.find({ mission: 'bla1' }, function (err, docs) {
+    console.log('Documents found:', docs.length);
 });
 
-// Find by _id
-db.projects.find({ _id: 'some_object_id' }, (err, docs) => {
+// Find by ID
+db.projects.find({ _id: 'ac0e7ogbcp8o1ksi7jwv0x1' }, function (err, docs) {
     console.log('Document:', docs[0]);
 });
 
 // Using operators ($in, $or)
 db.projects.find({
     $or: [
-        { mission: 'alpha' },
-        { status: 'critical' }
+        { mission: 'bla1' },
+        { mission: 'bla2' }
     ]
-}, (err, docs) => {
-    console.log('Complex query:', docs);
+}, function (err, docs) {
+    console.log('$or result:', docs);
 });
 
-// Range query ($bound)
+// Range search ($bound)
 db.projects.find({
-    timestamp: { $bound: [startDate, endDate] }
-}, (err, docs) => {
-    console.log('Time range:', docs);
+    timestamp: { $bound: [0, 1679322855220] }
+}, function (err, docs) {
+    console.log('Documents in range:', docs);
 });
 ```
 
-### Update
+#### Update
 
 ```javascript
-// Update document by _id
 db.projects.update(
-    { _id: 'some_object_id' },
+    { _id: 'ac0e7ogbcp8o1ksi7jwv0x1' }, // Query
     {
         $set: { status: 'completed' },
-        $addToSet: { tags: 'finished' }, // Add to array if not exists
-        $pull: { tags: 'pending' }       // Remove from array
-    },
-    { upsert: true }, // Create if not found
-    (err, numReplaced, upsert, newDoc) => {
-        console.log('Updated:', newDoc);
+        $addToSet: { tags: 'important' },
+        $pull: { tags: 'obsolete' }
+    }, // Update
+    { upsert: true }, // Options
+    function (err, numReplaced, upsert, response) {
+        console.log('Updated:', numReplaced);
     }
 );
 ```
 
-### Remove
+#### Remove
 
 ```javascript
 // Remove one document
-db.projects.remove({ _id: 'some_object_id' }, {}, (err, numRemoved) => {
-    console.log('Removed count:', numRemoved);
+db.projects.remove({ _id: 'ac0e7ogbcp8o1ksi7jwv0x1' }, {}, function (err, numRemoved) {
+    console.log('Removed:', numRemoved);
 });
 
-// Remove multiple documents (multi)
-db.projects.remove({ status: 'deleted' }, { multi: true }, (err, numRemoved) => {
-    console.log('Removed count:', numRemoved);
+// Remove multiple documents
+db.projects.remove({ status: 'deleted' }, { multi: true }, function (err, numRemoved) {
+    console.log('Multi remove:', numRemoved);
 });
 ```
 
 ## Low-level API
 
-If you don't need the MongoDB-style wrapper, you can use the client's direct methods:
+If you don't need the ORM-like interface, you can use direct IndexedDB methods:
 
-*   `InDB.setItem(dbName, storeName, object, callback)`
-*   `InDB.setItems(dbName, storeName, objects, callback)`
-*   `InDB.getItem(dbName, storeName, id, callback)`
-*   `InDB.getItems(dbName, storeName, queryObject, callback)`
-*   `InDB.deleteItem(dbName, storeName, id, callback)`
-*   `InDB.clearStore(dbName, storeName, options, callback)`
-
-Example with Promise (if no callback is provided):
+* `AppDB.setItem(dbName, storeName, object, callback)`
+* `AppDB.setItems(dbName, storeName, objects, callback)`
+* `AppDB.getItem(dbName, storeName, id, callback)`
+* `AppDB.getItems(dbName, storeName, queryObject, callback)`
+* `AppDB.deleteItem(dbName, storeName, id, callback)`
 
 ```javascript
-const result = await InDB.getItem('MyApplicationDB', 'projects', 'some_id');
+AppDB.setItem('MyDatabase', 'projects', { name: 'Direct Insert' }, function (err, result) {
+    console.log('Saved:', result);
+});
 ```
 
-## Web Worker Support
+## Web Workers Support
 
-To perform operations in a background thread, pass `true` as the first argument to the constructor. The library automatically creates an internal Blob Worker; no external files are required.
+AppDB supports running database operations inside a Web Worker to prevent blocking the main thread (UI).
 
 ```javascript
-// Run in Web Worker
-const InDB = new InDBClient(true, [], []); 
+// Initialize in Worker mode
+const AppDB = new AppDBClient(true, [], []); // true = use Worker
+
+// The rest of the API remains the same
+const db = AppDB.init('MyDatabase', { ... }, callback);
 ```
 
-This is recommended for large datasets or complex queries to avoid blocking the main UI thread.
+When using a Worker, all requests are passed asynchronously, which is particularly useful when processing large datasets or complex filtering.
 
-## Supported Operators
+## Supported Query Operators
 
-### Update Operators
-*   `$set`: Sets the value of a field.
-*   `$addToSet`: Adds an element to an array only if it does not already exist.
-*   `$pull`: Removes elements from an array that match the condition.
+The library supports several operators for flexible filtering:
 
-### Query Operators
-*   `$or`: Logical OR for an array of conditions.
-*   `$in`: Checks if a value is included in an array.
-*   `$bound`: Range search (for numbers or dates like `timestamp`). Format: `[min, max]`.
+* **Logical:** `$or`, `$in`
+* **Update:** `$set`, `$addToSet`, `$pull`
+* **Ranges:** `$bound` (array `[min, max]`), `$gt`, `$lt`, `$gte`, `$lte`
+* **Uniqueness:** Option `{ unique: ['fieldName'] }` in the `find` method to deduplicate results.
 
-## Query Options
+## Caching & Buffering
 
-*   `unique`: Array of fields to uniquify results on the client side.
-*   `multi`: (for `remove`) Remove multiple documents or only the first one.
-*   `upsert`: (for `update`) Create the document if it is not found.
-*   `bufferlock`: (for `setItem`) Prevent buffering for specific operations.
-*   `updatelock`: (for `setItem`) Use `add` instead of `put` (fail if exists).
+### Caching
+
+AppDB has a built-in mechanism to cache query results in memory.
+
+* The cache automatically updates upon insert, update, or delete operations.
+* Caching can be disabled for specific stores via the `cachelock` parameter in the constructor.
+
+```javascript
+// Disable cache for 'logs' store
+const AppDB = new AppDBClient(false, [], ['logs']); 
+```
+
+### Buffering
+
+Write operations can be buffered for specific stores to optimize performance.
+
+* Configure via the `buffer` parameter in the constructor.
+
+```javascript
+// Enable buffering for 'events' store
+const AppDB = new AppDBClient(false, ['events'], []); 
+```
+
+## Promises Support
+
+All methods support Promises if a callback is not provided.
+
+```javascript
+db.projects.insert({ name: 'Promise Project' })
+    .then(({ error, result }) => {
+        if (error) throw error;
+        console.log('Inserted:', result);
+    })
+    .catch(console.error);
+```
 
 ## License
 
-MIT (Based on code structure, please verify with the repository's license file).
+MIT
 
 ---
 
-*InDB is inspired by the NeDB architecture but adapted for modern browsers using IndexedDB and Web Workers.*
+*Note: This library is a wrapper over IndexedDB and is intended for use in modern browsers.*
