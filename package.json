@@ -6,14 +6,35 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.esm.js",
   "browser": "./dist/index.umd.js",
-  "scripts": {
-    "build": ""
+  "exports": {
+    ".": {
+      "import": "./dist/index.esm.js",
+      "require": "./dist/index.cjs",
+      "browser": "./dist/index.umd.js"
+    }
   },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rollup -c",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^29.0.0",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "rollup": "^4.58.0"
+  },
+  "keywords": [
+    "universal",
+    "isomorphic",
+    "node",
+    "browser"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/MarkMuravev/AppDB.git"
   },
-  "keywords": [],
   "author": "Mark Muravev <mark@echosystem.ru> (https://github.com/MarkMuravev)",
   "license": "MIT",
   "bugs": {

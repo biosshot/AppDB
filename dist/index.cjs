@@ -1,8 +1,9 @@
-const isNode = typeof process !== 'undefined' && process.versions && process.versions.node;
+'use strict';
 
-export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
+typeof process !== 'undefined' && process.versions && process.versions.node;
+
+async function AppDBClient(inWorker, buffer = [], cachelock = []) {
     buffer = buffer.filter((storeName) => storeName !== 'buffer');
-    const thread = 'main';
     let worker = null;
 
     if (inWorker) {
@@ -63,7 +64,7 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
         worker.onmessage = function (e) {
             this.dispatchEvent(new CustomEvent(e.data[0], { bubbles: false, detail: { error: e.data[1], result: e.data[2], length: e.data[3] } }));
             return delete e.data;
-        }
+        };
     }
 
     async function workerBridge(method, transfer, callback) {
@@ -83,7 +84,7 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
                 callback(e.detail.error, e.detail.result);
                 return worker.removeEventListener(target, workerResult);
             }
-        }
+        };
         return worker.addEventListener(target, workerResult), transfer = null;
     }
 
@@ -151,7 +152,7 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
 
             dbRequest.onerror = function (event) {
                 callback(event);
-            }
+            };
 
             dbRequest.onupgradeneeded = function (event) {
                 const database = event.target.result;
@@ -159,11 +160,11 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
                 database.onerror = function (event) {
                     callback(event);
                     database.close();
-                }
+                };
 
                 database.onversionchange = function (event) {
                     database.close();
-                }
+                };
 
                 function getStore(storeName) {
                     if (database.objectStoreNames.contains(storeName)) {
@@ -187,7 +188,7 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
                         objectStore.deleteIndex(element);
                     });
                 }
-            }
+            };
 
             dbRequest.onsuccess = function (event) {
                 const database = event.target.result;
@@ -210,7 +211,7 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
 
                 callback(null, database, upgrade);
                 database.close();
-            }
+            };
         }
 
         openDatabase();
@@ -222,7 +223,7 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
 
             dbRequest.onerror = function (event) {
                 callback(event);
-            }
+            };
 
             dbRequest.onupgradeneeded = function (event) {
                 const database = event.target.result;
@@ -230,11 +231,11 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
                 database.onerror = function (event) {
                     callback(event);
                     database.close();
-                }
+                };
 
                 database.onversionchange = function (event) {
                     database.close();
-                }
+                };
 
                 if (!keys) return;
 
@@ -258,7 +259,7 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
                     // if (element === '_id') return;
                     objectStore.deleteIndex(element);
                 });
-            }
+            };
 
             dbRequest.onsuccess = function (event) {
                 const database = event.target.result;
@@ -274,7 +275,7 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
                 }
 
                 callback(null, database);
-            }
+            };
         }
 
         openDatabase();
@@ -339,12 +340,12 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
             delete cache.data[id];
             for (const hash of Object.keys(cache.hashes)) cache.hashes[hash] = cache.hashes[hash].filter((cachedId) => cachedId !== id);
         }
-    }
+    };
 
     function setItem(dbName, storeName, object, callback, options = { bufferlock: false, updatelock: false, origin: false }) {
         if (!callback) return new Promise((resolve) => setItem(dbName, storeName, object, (error, result) => resolve({ error, result }), options));
 
-        if (thread === 'main' && worker) return workerBridge('setItem', arguments, (error, result) => {
+        if (worker) return workerBridge('setItem', arguments, (error, result) => {
             if (result && result._id && !cachelock.includes(storeName)) cache.setById([result]);
             callback(error, result);
         });
@@ -370,12 +371,12 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
                 callback(message);
                 database.close();
                 collector.setItem.next();
-            }
+            };
 
             objectRequest.onsuccess = function (event) {
                 if (objectRequest.result === object._id) {
                     let result = objectConverter(object, true);
-                    if (thread === 'main' && !cachelock.includes(storeName)) cache.setById([result]);
+                    if (!cachelock.includes(storeName)) cache.setById([result]);
                     callback(null, result);
                 } else {
                     callback(Error('Data saved without result'));
@@ -383,7 +384,7 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
 
                 database.close();
                 collector.setItem.next();
-            }
+            };
 
             if (buffer.includes(storeName) && !options.bufferlock) setItem(dbName, 'buffer', object, function (error, result) {
                 // console.log('[Buffer] setItem:', error, result);
@@ -394,7 +395,7 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
     function setItems(dbName, storeName, objects, callback, options = { bufferlock: false, updatelock: false }) {
         if (!callback) return new Promise((resolve) => setItems(dbName, storeName, objects, (error, result) => resolve({ error, result }), options));
 
-        if (thread === 'main' && worker) return workerBridge('setItems', arguments, (error, results) => {
+        if (worker) return workerBridge('setItems', arguments, (error, results) => {
             if (results && results.length && !cachelock.includes(storeName)) cache.setById(results);
             callback(error, results);
         });
@@ -417,7 +418,7 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
                 const objectStoreRequest = !options.updatelock ? objectStore.put(object) : objectStore.add(object);
                 objectStoreRequest.onerror = (event) => {
                     event.preventDefault();
-                }
+                };
             }
 
             transaction.onerror = function (event) {
@@ -426,15 +427,15 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
                 callback(message);
                 database.close();
                 collector.setItems.next();
-            }
+            };
 
             transaction.oncomplete = function (event) {
                 let results = objects.map((object) => objectConverter(object, true));
-                if (thread === 'main' && !cachelock.includes(storeName)) cache.setById(results);
+                if (!cachelock.includes(storeName)) cache.setById(results);
                 callback(null, results);
                 database.close();
                 collector.setItems.next();
-            }
+            };
 
             if (buffer.includes(storeName) && !options.bufferlock) setItems(dbName, 'buffer', objects, function (error, result) {
                 // console.log('[Buffer] setItems:', error, result);
@@ -446,7 +447,7 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
         if (!callback) return new Promise((resolve) => getItem(dbName, storeName, id, (error, result) => resolve({ error, result })));
 
         const cached = {};
-        if (thread === 'main') {
+        {
             if (!cachelock.includes(storeName)) {
                 cached.hash = cache.hash([dbName, storeName, id]);
                 cached.results = cache.get(cached.hash) || (typeof id === 'string') ? cache.getById(id) : null;
@@ -472,14 +473,14 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
                 objectRequest.onerror = function (event) {
                     callback(event);
                     database.close();
-                }
+                };
 
                 objectRequest.onsuccess = function (event) {
                     let result = objectConverter(objectRequest.result, true);
                     if (!cached.results || !cached.results[0]) callback(null, result);
-                    if (thread === 'main' && !cachelock.includes(storeName)) cache.set(cached.hash, [result]);
+                    if (!cachelock.includes(storeName)) cache.set(cached.hash, [result]);
                     database.close();
-                }
+                };
             } else {
                 const names = objectStore.indexNames;
                 const index = names.contains('timestamp') ? objectStore.index('timestamp') : null;
@@ -488,7 +489,7 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
                 openCursorRequest.onerror = () => {
                     callback(event);
                     database.close();
-                }
+                };
 
                 openCursorRequest.onsuccess = () => {
                     const objectRequest = objectStore.get(openCursorRequest.result.primaryKey);
@@ -496,15 +497,15 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
                     objectRequest.onerror = function (event) {
                         callback(event);
                         database.close();
-                    }
+                    };
 
                     objectRequest.onsuccess = function (event) {
                         let result = objectConverter(objectRequest.result, true);
                         if (!cached.results || !cached.results[0]) callback(null, result);
-                        if (thread === 'main' && !cachelock.includes(storeName)) cache.set(cached.hash, [result]);
+                        if (!cachelock.includes(storeName)) cache.set(cached.hash, [result]);
                         database.close();
-                    }
-                }
+                    };
+                };
             }
         });
     }
@@ -513,7 +514,7 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
         if (!callback) return new Promise((resolve) => getItems(dbName, storeName, object, (error, result) => resolve({ error, result }), options));
 
         const cached = {};
-        if (thread === 'main') {
+        {
             if (!cachelock.includes(storeName)) {
                 cached.hash = cache.hash([dbName, storeName, object, options]);
                 cached.results = cache.get(cached.hash);
@@ -557,10 +558,10 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
                 results.sort((a, b) => b.timestamp - a.timestamp);
                 results = results.map((element) => objectConverter(element, true));
                 if (!cached.results) callback(null, results);
-                if (thread === 'main' && !cachelock.includes(storeName)) cache.set(cached.hash, results);
+                if (!cachelock.includes(storeName)) cache.set(cached.hash, results);
                 database.close();
                 // collector.getItems.next();
-            }
+            };
 
             if (items.length === 0) {
                 const objectRequest = objectStore.getAll();
@@ -568,11 +569,11 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
                     callback(event);
                     database.close();
                     // collector.getItems.next();
-                }
+                };
 
                 objectRequest.onsuccess = function (event) {
                     success(event.target.result);
-                }
+                };
 
                 return;
             }
@@ -589,7 +590,7 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
                     if (!item[1].upperOpen && value[item[0]] > item[1].upper) return false;
                 }
                 return true;
-            }
+            };
 
             const allowedTypes = ['number', 'date', 'string', 'binary', 'array', 'object'];
 
@@ -606,19 +607,19 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
                 callback(event);
                 database.close();
                 // collector.getItems.next();
-            }
+            };
 
             objectRequest.onsuccess = function (event) {
                 // success(objectRequest.result);
                 success(objectRequest.result.filter((value) => checkValue(value)));
-            }
+            };
         });
     }
 
     function deleteItem(dbName, storeName, id, callback) {
         if (!callback) return new Promise((resolve) => deleteItem(dbName, storeName, id, (error, result) => resolve({ error, result })));
 
-        if (thread === 'main' && worker) return workerBridge('deleteItem', arguments, (error, result) => {
+        if (worker) return workerBridge('deleteItem', arguments, (error, result) => {
             if (result && !cachelock.includes(storeName)) cache.delete(result);
             callback(error, result);
         });
@@ -632,18 +633,18 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
             objectRequest.onerror = function (event) {
                 callback(event);
                 database.close();
-            }
+            };
 
             objectRequest.onsuccess = function (event) {
-                if (thread === 'main' && !cachelock.includes(storeName)) cache.delete(id);
+                if (!cachelock.includes(storeName)) cache.delete(id);
                 callback(null, id);
                 database.close();
-            }
+            };
         });
     }
 
     function clearStore(dbName, storeName, options, callback) {
-        if (thread === 'main' && worker) return workerBridge('clearStore', arguments, (error, result) => callback(error, result));
+        if (worker) return workerBridge('clearStore', arguments, (error, result) => callback(error, result));
         openIndexedDB(dbName, storeName, null, (error, database) => {
             if (error) return callback(error);
             const transaction = database.transaction([storeName], 'readwrite');
@@ -653,12 +654,12 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
             objectRequest.onerror = function (event) {
                 callback(event);
                 database.close();
-            }
+            };
 
             objectRequest.onsuccess = function (event) {
                 callback(null, true);
                 database.close();
-            }
+            };
         });
     }
 
@@ -753,7 +754,7 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
                     });
                 }
             }
-        }
+        };
 
         const find = function (storeName) {
             return function (object, callback, options) {
@@ -854,7 +855,7 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
                     }
                 }
             }
-        }
+        };
 
         const insert = function (storeName) {
             return function (object, callback, options) {
@@ -863,7 +864,7 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
                     if (callback) callback(error, result);
                 }, options);
             }
-        }
+        };
 
         const remove = function (storeName) {
             return function (object, options, callback) {
@@ -899,7 +900,7 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
                     });
                 }
             }
-        }
+        };
 
         const methods = {};
         for (const storeName of Object.keys(stores)) {
@@ -908,7 +909,7 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
                 find: find(storeName),
                 insert: insert(storeName),
                 remove: remove(storeName)
-            }
+            };
         }
         return methods;
     }
@@ -921,4 +922,7 @@ export async function AppDBClient(inWorker, buffer = [], cachelock = []) {
         getItems: getItems,
         deleteItem: deleteItem
     }
-};
+}
+
+exports.AppDBClient = AppDBClient;
+//# sourceMappingURL=index.cjs.map
