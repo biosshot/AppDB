@@ -1,7 +1,7 @@
 {
-  "name": "foundb",
-  "version": "1.0.2",
-  "description": "FounDB",
+  "name": "appdb",
+  "version": "1.0.1",
+  "description": "AppDB",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.esm.js",
@@ -11,13 +11,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MarkMuravev/FounDB.git"
+    "url": "git+https://github.com/MarkMuravev/AppDB.git"
   },
   "keywords": [],
   "author": "Mark Muravev <mark@echosystem.ru> (https://github.com/MarkMuravev)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/MarkMuravev/FounDB/issues"
+    "url": "https://github.com/MarkMuravev/AppDB/issues"
   },
-  "homepage": "https://github.com/MarkMuravev/FounDB#readme"
+  "homepage": "https://github.com/MarkMuravev/AppDB#readme"
 }
