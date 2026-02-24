@@ -1,8 +1,10 @@
 'use strict';
 
+Object.defineProperty(exports, '__esModule', { value: true });
+
 const isNode = typeof process !== 'undefined' && process.versions?.node;
 
-function AppDBClient(inWorker = false, buffer = [], cachelock = []) {
+function index (inWorker = false, buffer = [], cachelock = []) {
     if (isNode) inWorker = false;
     buffer = buffer.filter((storeName) => storeName !== 'buffer');
     let worker = null;
@@ -925,5 +927,5 @@ function AppDBClient(inWorker = false, buffer = [], cachelock = []) {
     }
 }
 
-exports.AppDBClient = AppDBClient;
+exports.default = index;
 //# sourceMappingURL=appdb.cjs.map

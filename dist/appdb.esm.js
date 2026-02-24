@@ -1,6 +1,6 @@
 const isNode = typeof process !== 'undefined' && process.versions?.node;
 
-function AppDBClient(inWorker = false, buffer = [], cachelock = []) {
+function index (inWorker = false, buffer = [], cachelock = []) {
     if (isNode) inWorker = false;
     buffer = buffer.filter((storeName) => storeName !== 'buffer');
     let worker = null;
@@ -923,5 +923,5 @@ function AppDBClient(inWorker = false, buffer = [], cachelock = []) {
     }
 }
 
-export { AppDBClient };
+export { index as default };
 //# sourceMappingURL=appdb.esm.js.map

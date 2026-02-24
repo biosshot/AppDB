@@ -6,7 +6,7 @@
 
     const isNode = typeof process !== 'undefined' && process.versions?.node;
 
-    function AppDBClient(inWorker = false, buffer = [], cachelock = []) {
+    function index (inWorker = false, buffer = [], cachelock = []) {
         if (isNode) inWorker = false;
         buffer = buffer.filter((storeName) => storeName !== 'buffer');
         let worker = null;
@@ -929,7 +929,9 @@
         }
     }
 
-    exports.AppDBClient = AppDBClient;
+    exports.default = index;
+
+    Object.defineProperty(exports, '__esModule', { value: true });
 
 }));
 //# sourceMappingURL=appdb.umd.js.map
