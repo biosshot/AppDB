@@ -1,7 +1,8 @@
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
+import { dts } from 'rollup-plugin-dts';
 
-export default {
+export default [{
     input: 'src/index.js',
     output: [
         {
@@ -28,4 +29,8 @@ export default {
         commonjs(), // Позволяет импортировать CommonJS модули (если зависимости старые)
     ],
     external: [] // внешние зависимости, которые не нужно бандлить 
-};
+}, {
+    input: 'src/index.d.ts',
+    output: [{ file: 'dist/index.d.ts', format: 'es' }],
+    plugins: [dts()],
+}];
