@@ -26,9 +26,36 @@ export default [{
     ],
     plugins: [
         resolve(), // Позволяет импортировать модули из node_modules
-        commonjs(), // Позволяет импортировать CommonJS модули (если зависимости старые)
+        commonjs(), // Позволяет импортировать CommonJS модули
     ],
     external: [] // внешние зависимости, которые не нужно бандлить 
+}, {
+    input: 'src/index.min.js',
+    output: [
+        {
+            file: 'dist/appdb.esm.min.js',
+            format: 'esm',
+            sourcemap: true,
+        },
+        {
+            file: 'dist/appdb.min.cjs',
+            format: 'cjs',
+            sourcemap: true,
+            exports: 'named',
+        },
+        {
+            file: 'dist/appdb.umd.min.js',
+            format: 'umd',
+            name: 'AppDBClient',
+            sourcemap: true,
+            exports: 'named',
+        },
+    ],
+    plugins: [
+        resolve(),
+        commonjs(),
+    ],
+    external: []
 }, {
     input: 'src/index.d.ts',
     output: [{ file: 'dist/appdb.d.ts', format: 'es' }],
