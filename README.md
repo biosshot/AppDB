@@ -1,7 +1,6 @@
-
 # AppDB
 
-**AppDB** is a lightweight embedded database for JavaScript applications running in the browser, built on top of **IndexedDB**. It provides an API similar to **NeDB** and **MongoDB**, making it easy to learn for developers familiar with these tools.
+**AppDB** is a lightweight embedded database for JavaScript applications (Browser, Electron.js, NW.js, Apache Cordova, Ionic and others), built on top of **IndexedDB**. It provides an API similar to **NeDB** and **MongoDB**, making it easy to learn for developers familiar with these tools.
 
 AppDB supports execution in both the **main thread** and **Web Workers**, allowing heavy database operations to be performed without blocking the user interface.
 
