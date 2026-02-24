@@ -1,16 +1,16 @@
 {
   "name": "appdb",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "AppDB",
   "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.esm.js",
-  "browser": "./dist/index.umd.js",
+  "main": "./dist/appdb.cjs",
+  "module": "./dist/appdb.esm.js",
+  "browser": "./dist/appdb.umd.js",
   "exports": {
     ".": {
-      "import": "./dist/index.esm.js",
-      "require": "./dist/index.cjs",
-      "browser": "./dist/index.umd.js"
+      "import": "./dist/appdb.esm.js",
+      "require": "./dist/appdb.cjs",
+      "browser": "./dist/appdb.umd.js"
     }
   },
   "files": [
