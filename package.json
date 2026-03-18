@@ -9,6 +9,7 @@
   "types": "./dist/appdb.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/appdb.d.ts",
       "import": "./dist/appdb.esm.js",
       "require": "./dist/appdb.cjs",
       "browser": "./dist/appdb.umd.js"
@@ -19,11 +20,14 @@
   ],
   "scripts": {
     "build": "rollup -c",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test": "node --test tests/test.ts"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
+    "@types/node": "^25.5.0",
+    "fake-indexeddb": "^6.2.5",
     "rollup": "^4.58.0",
     "rollup-plugin-dts": "^6.3.0"
   },

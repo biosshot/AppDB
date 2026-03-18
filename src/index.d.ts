@@ -25,11 +25,6 @@ export interface AppDBError {
     message: string;
 }
 
-export interface AppDBResult<T = any> {
-    error: AppDBError | null;
-    result: T;
-}
-
 export type AppDBCallback<T = any> = (error: AppDBError | null, result: T) => void;
 
 export type AppDBUpdateCallback = (
@@ -88,13 +83,13 @@ export interface AppDBStore<T extends AppDBDocument = AppDBDocument> {
     /**
      * Insert a new document into the store
      */
-    insert(object: T, callback?: AppDBCallback<T>): Promise<AppDBResult<T>>;
+    insert(object: T, callback?: AppDBCallback<T>): Promise<T>;
     insert(object: T, callback: AppDBCallback<T>, options?: AppDBOptions): void;
 
     /**
      * Find documents matching the query
      */
-    find(object: AppDBQueryObject, callback?: AppDBCallback<T[]>): Promise<AppDBResult<T[]>>;
+    find(object: AppDBQueryObject, callback?: AppDBCallback<T[]>): Promise<T[]>;
     find(object: AppDBQueryObject, callback: AppDBCallback<T[]>, options?: AppDBQueryOptions): void;
 
     /**
@@ -105,12 +100,16 @@ export interface AppDBStore<T extends AppDBDocument = AppDBDocument> {
         updateObject: AppDBUpdateObject,
         options?: AppDBUpdateOptions,
         callback?: AppDBUpdateCallback
-    ): Promise<AppDBResult<number>>;
+    ): Promise<{
+        numReplaced: number,
+        upsert: boolean,
+        response: any
+    }>;
 
     /**
      * Remove documents matching the query
      */
-    remove(query: AppDBQueryObject, options?: AppDBRemoveOptions, callback?: AppDBRemoveCallback): Promise<AppDBResult<number>>;
+    remove(query: AppDBQueryObject, options?: AppDBRemoveOptions, callback?: AppDBRemoveCallback): Promise<number>;
 }
 
 // Database stores map
@@ -129,6 +128,24 @@ export interface AppDBClientInstance {
         callback: AppDBInitCallback
     ): { [K in keyof T]: AppDBStore };
 
+    init<T extends AppDBStoresMap>(
+        dbName: string,
+        stores: T,
+        callback?: undefined
+    ): Promise<{ [K in keyof T]: AppDBStore }>;
+
+    clearStore(
+        dbName: string,
+        storeName: string,
+        callback: AppDBCallback<boolean>
+    ): void
+
+    clearStore(
+        dbName: string,
+        storeName: string,
+        callback?: undefined
+    ): Promise<boolean>
+
     /**
      * Insert or update a single item
      */
@@ -136,9 +153,18 @@ export interface AppDBClientInstance {
         dbName: string,
         storeName: string,
         object: T,
-        callback?: AppDBCallback<T>,
+        callback: AppDBCallback<T & AppDBDocument>,
         options?: AppDBOptions
-    ): Promise<AppDBResult<T>>;
+    ): void;
+
+    setItem<T = any>(
+        dbName: string,
+        storeName: string,
+        object: T,
+        callback?: undefined,
+        options?: AppDBOptions
+    ): Promise<T & AppDBDocument>;
+
 
     /**
      * Insert or update multiple items
@@ -147,9 +173,17 @@ export interface AppDBClientInstance {
         dbName: string,
         storeName: string,
         objects: T[],
-        callback?: AppDBCallback<T[]>,
+        callback: AppDBCallback<T[]>,
         options?: AppDBOptions
-    ): Promise<AppDBResult<T[]>>;
+    ): void;
+
+    setItems<T = any>(
+        dbName: string,
+        storeName: string,
+        objects: T[],
+        callback?: undefined,
+        options?: AppDBOptions
+    ): Promise<T[]>;
 
     /**
      * Get a single item by ID
@@ -158,8 +192,15 @@ export interface AppDBClientInstance {
         dbName: string,
         storeName: string,
         id: string | null,
-        callback?: AppDBCallback<T>
-    ): Promise<AppDBResult<T>>;
+        callback: AppDBCallback<T>
+    ): void;
+
+    getItem<T = any>(
+        dbName: string,
+        storeName: string,
+        id: string | null,
+        callback?: undefined
+    ): Promise<T>;
 
     /**
      * Get multiple items matching the query
@@ -168,9 +209,17 @@ export interface AppDBClientInstance {
         dbName: string,
         storeName: string,
         object: AppDBQueryObject,
-        callback?: AppDBCallback<T[]>,
+        callback: AppDBCallback<T[]>,
         options?: AppDBQueryOptions
-    ): Promise<AppDBResult<T[]>>;
+    ): void;
+
+    getItems<T = any>(
+        dbName: string,
+        storeName: string,
+        object: AppDBQueryObject,
+        callback?: undefined,
+        options?: AppDBQueryOptions
+    ): Promise<T[]>;
 
     /**
      * Delete an item by ID
@@ -179,13 +228,21 @@ export interface AppDBClientInstance {
         dbName: string,
         storeName: string,
         id: string,
-        callback?: AppDBCallback<string>
-    ): Promise<AppDBResult<string>>;
+        callback: AppDBCallback<string>
+    ): void;
+
+    deleteItem(
+        dbName: string,
+        storeName: string,
+        id: string,
+        callback?: undefined
+    ): Promise<string>;
 }
 
 // Constructor type
 export interface AppDBClientConstructor {
-    new(inWorker?: boolean, buffer?: string[], cachelock?: string[]): AppDBClientInstance;
+    new(inWorker: true, buffer?: string[], cachelock?: string[]): AppDBClientInstance;
+    new(inWorker: false, buffer?: string[], cachelock?: string[], customIndexedDb?: { indexedDB: unknown, IDBKeyRange: unknown }): AppDBClientInstance;
 }
 
 // Export the main class

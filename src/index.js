@@ -1,10 +1,19 @@
 const isNode = typeof process !== 'undefined' && process.versions?.node;
 
-export default function (inWorker = false, buffer = [], cachelock = []) {
+export default function (inWorker = false, buffer = [], cachelock = [], idb = undefined) {
     if (isNode) inWorker = false;
     buffer = buffer.filter((storeName) => storeName !== 'buffer');
     const thread = 'main';
     let worker = null;
+
+    if(inWorker && idb)
+        throw new Error('Custom indexedDB allowed only if inWorker = false ')
+
+    const indexedDB = idb?.indexedDB || (typeof indexedDB !== 'undefined' ? indexedDB : null);
+    const IDBKeyRange = idb?.IDBKeyRange || (typeof IDBKeyRange !== 'undefined' ? IDBKeyRange : null);
+
+    if (!indexedDB) throw new Error('indexedDB not impl')
+    if (!IDBKeyRange) throw new Error('IDBKeyRange not impl')
 
     if (inWorker) {
         const workerCode = `
@@ -103,7 +112,8 @@ export default function (inWorker = false, buffer = [], cachelock = []) {
         return [a1.filter(i => !a2.includes(i)), a2.filter(i => !a1.includes(i))];
     }
 
-    function objectConverter(object = {}, result = false) {
+    function objectConverter(object, result = false) {
+        if (!object) return object;
         return Object.fromEntries(Object.entries(object).map((element, index, array) => {
             if (element[1] !== null && element[1] !== undefined) {
                 if (!result) {
@@ -343,7 +353,7 @@ export default function (inWorker = false, buffer = [], cachelock = []) {
     }
 
     function setItem(dbName, storeName, object, callback, options = { bufferlock: false, updatelock: false, origin: false }) {
-        if (!callback) return new Promise((resolve) => setItem(dbName, storeName, object, (error, result) => resolve({ error, result }), options));
+        if (!callback) return new Promise((resolve, reject) => setItem(dbName, storeName, object, (error, result) => error ? reject(error) : resolve(result), options));
 
         if (thread === 'main' && worker) return workerBridge('setItem', arguments, (error, result) => {
             if (result && result._id && !cachelock.includes(storeName)) cache.setById([result]);
@@ -351,7 +361,7 @@ export default function (inWorker = false, buffer = [], cachelock = []) {
         });
 
         if (collector.setItem.writing) {
-            return collector.setItem.buffer.push(arguments);
+            collector.setItem.buffer.push(arguments);
         } else {
             collector.setItem.writing = true;
         }
@@ -393,7 +403,7 @@ export default function (inWorker = false, buffer = [], cachelock = []) {
     }
 
     function setItems(dbName, storeName, objects, callback, options = { bufferlock: false, updatelock: false }) {
-        if (!callback) return new Promise((resolve) => setItems(dbName, storeName, objects, (error, result) => resolve({ error, result }), options));
+        if (!callback) return new Promise((resolve, reject) => setItems(dbName, storeName, objects, (error, result) => error ? reject(error) : resolve(result), options));
 
         if (thread === 'main' && worker) return workerBridge('setItems', arguments, (error, results) => {
             if (results && results.length && !cachelock.includes(storeName)) cache.setById(results);
@@ -444,7 +454,7 @@ export default function (inWorker = false, buffer = [], cachelock = []) {
     }
 
     function getItem(dbName, storeName, id, callback) {
-        if (!callback) return new Promise((resolve) => getItem(dbName, storeName, id, (error, result) => resolve({ error, result })));
+        if (!callback) return new Promise((resolve, reject) => getItem(dbName, storeName, id, (error, result) => error ? reject(error) : resolve(result)));
 
         const cached = {};
         if (thread === 'main') {
@@ -511,7 +521,7 @@ export default function (inWorker = false, buffer = [], cachelock = []) {
     }
 
     function getItems(dbName, storeName, object, callback, options = { unique: false }) {
-        if (!callback) return new Promise((resolve) => getItems(dbName, storeName, object, (error, result) => resolve({ error, result }), options));
+        if (!callback) return new Promise((resolve, reject) => getItems(dbName, storeName, object, (error, result) => error ? reject(error) : resolve(result), options));
 
         const cached = {};
         if (thread === 'main') {
@@ -617,7 +627,7 @@ export default function (inWorker = false, buffer = [], cachelock = []) {
     }
 
     function deleteItem(dbName, storeName, id, callback) {
-        if (!callback) return new Promise((resolve) => deleteItem(dbName, storeName, id, (error, result) => resolve({ error, result })));
+        if (!callback) return new Promise((resolve, reject) => deleteItem(dbName, storeName, id, (error, result) => error ? reject(error) : resolve(result)));
 
         if (thread === 'main' && worker) return workerBridge('deleteItem', arguments, (error, result) => {
             if (result && !cachelock.includes(storeName)) cache.delete(result);
@@ -644,6 +654,7 @@ export default function (inWorker = false, buffer = [], cachelock = []) {
     }
 
     function clearStore(dbName, storeName, options, callback) {
+        if (!callback) return new Promise((resolve, reject) => clearStore(dbName, storeName, options, (error, result) => error ? reject(error) : resolve(result)));
         if (thread === 'main' && worker) return workerBridge('clearStore', arguments, (error, result) => callback(error, result));
         openIndexedDB(dbName, storeName, null, (error, database) => {
             if (error) return callback(error);
@@ -657,6 +668,8 @@ export default function (inWorker = false, buffer = [], cachelock = []) {
             }
 
             objectRequest.onsuccess = function (event) {
+                cache.data = {};
+                cache.hashes = {};
                 callback(null, true);
                 database.close();
             }
@@ -664,19 +677,33 @@ export default function (inWorker = false, buffer = [], cachelock = []) {
     }
 
     function init(dbName, stores, initCallback) {
+        let initIndexDbPromise;
+
         if (stores) {
-            initIndexedDB(dbName, stores, (error, database, upgrade) => {
-                initCallback(error, database, upgrade, (worker ? true : false));
-            });
+            if (!initCallback)
+                initIndexDbPromise = new Promise((resolve, reject) => {
+                    initIndexedDB(dbName, stores, (error, database, upgrade) => {
+                        error ? reject(error) : resolve({ database, upgrade, worker: (worker ? true : false) });
+                    });
+                })
+            else
+                initIndexedDB(dbName, stores, (error, database, upgrade) => {
+                    initCallback(error, database, upgrade, (worker ? true : false));
+                });
         } else {
-            return callback(Error('Set stores to init database'));
+            if (initCallback)
+                return Promise.resolve({ error: Error('Set stores to init database') })
+            else
+                initCallback(Error('Set stores to init database'));
+
+            return undefined;
         }
 
         const update = function (storeName) {
-            return function (object, update = { $set: {} }, options = { upsert: true }, callback) {
+            function updateImpl(object, update = { $set: {} }, options = { upsert: true }, callback) {
                 object = Object.assign({}, object);
                 if (object._id) {
-                    getItem(dbName, storeName, object._id, function (error, document) {
+                    return getItem(dbName, storeName, object._id, function (error, document) {
                         if (error && callback) return callback(error);
                         if (!document || !Object.keys(document).length) document = object;
 
@@ -714,7 +741,7 @@ export default function (inWorker = false, buffer = [], cachelock = []) {
                         });
                     });
                 } else {
-                    getItems(dbName, storeName, object, function (error, documents) {
+                    return getItems(dbName, storeName, object, function (error, documents) {
                         if (error && callback) return callback(error);
                         if (!documents[0] || !Object.keys(documents[0]).length) documents[0] = object;
 
@@ -754,15 +781,25 @@ export default function (inWorker = false, buffer = [], cachelock = []) {
                     });
                 }
             }
+
+            return function (object, update = { $set: {} }, options = { upsert: true }, callback) {
+                if (callback) return updateImpl(object, update, options, callback);
+                return new Promise((resolve, reject) => {
+                    updateImpl(object, update, options, (error, numReplaced, upsert, response) => error ? reject(error) : resolve({
+                        numReplaced,
+                        upsert,
+                        response
+                    }));
+                })
+            }
         }
 
         const find = function (storeName) {
-            return function (object, callback, options) {
+            function findImpl(object, callback, options) {
                 object = Object.assign({}, object);
                 if (hasOperators(object)) {
                     if (object.$or) {
                         let results = [];
-                        operatorIteration(0);
 
                         function operatorIteration(i) {
                             if (object.$or[i]._id) {
@@ -771,7 +808,7 @@ export default function (inWorker = false, buffer = [], cachelock = []) {
                                         nestedOperatorIteration(0);
 
                                         function nestedOperatorIteration(x) {
-                                            getItem(dbName, storeName, object.$or[i]._id.$in[x], function (error, document) {
+                                            return getItem(dbName, storeName, object.$or[i]._id.$in[x], function (error, document) {
                                                 results = results.concat(!emptyObject(document) ? [document] : []), x++;
                                                 if (x < object.$or[i]._id.$in.length) return nestedOperatorIteration(x);
                                                 i++;
@@ -780,21 +817,24 @@ export default function (inWorker = false, buffer = [], cachelock = []) {
                                             });
                                         }
                                     }
+                                    else return Promise.resolve(undefined)
                                 } else {
-                                    getItem(dbName, storeName, object.$or[i]._id, function (error, document) {
+                                    return getItem(dbName, storeName, object.$or[i]._id, function (error, document) {
                                         results = results.concat(!emptyObject(document) ? [document] : []), i++;
                                         if (i < object.$or.length) return operatorIteration(i);
                                         if (callback) callback(error, results);
                                     });
                                 }
                             } else {
-                                getItems(dbName, storeName, object.$or[i], function (error, documents) {
+                                return getItems(dbName, storeName, object.$or[i], function (error, documents) {
                                     results = results.concat(documents), i++;
                                     if (i < object.$or.length) return operatorIteration(i);
                                     if (callback) callback(error, results);
                                 }, options);
                             }
                         }
+
+                        return operatorIteration(0);
                     }
                 } else {
                     if (object._id) {
@@ -819,15 +859,12 @@ export default function (inWorker = false, buffer = [], cachelock = []) {
                     } else if (hasNestedOperators(object)) {
                         const keys = Object.keys(object);
                         let results = [];
-                        operatorIteration(0);
 
                         function operatorIteration(i) {
                             if (hasOperators(object[keys[i]])) {
                                 if (object[keys[i]].$in) {
-                                    nestedOperatorIteration(0);
-
                                     function nestedOperatorIteration(x) {
-                                        getItems(dbName, storeName, {
+                                        return getItems(dbName, storeName, {
                                             [keys[i]]: object[keys[i]].$in[x]
                                         }, function (error, documents) {
                                             results = results.concat(documents), x++;
@@ -837,9 +874,13 @@ export default function (inWorker = false, buffer = [], cachelock = []) {
                                             if (callback) callback(error, results);
                                         }, options);
                                     }
+
+                                    return nestedOperatorIteration(0);
                                 }
+                                else return Promise.resolve(undefined);
+                                // not 
                             } else {
-                                getItems(dbName, storeName, {
+                                return getItems(dbName, storeName, {
                                     [keys[i]]: object[keys[i]]
                                 }, function (error, documents) {
                                     results = results.concat(documents), i++;
@@ -848,37 +889,53 @@ export default function (inWorker = false, buffer = [], cachelock = []) {
                                 }, options);
                             }
                         }
+
+                        return operatorIteration(0);
                     } else {
-                        getItems(dbName, storeName, object, function (error, documents) {
+                        return getItems(dbName, storeName, object, function (error, documents) {
                             if (callback) callback(error, documents);
                         }, options);
                     }
                 }
             }
+
+            return function (object, options, callback) {
+                if (callback) return findImpl(object, callback, options);
+                return new Promise((resolve, reject) => {
+                    findImpl(object, (error, result) => error ? reject(error) : resolve(result), options);
+                })
+            }
         }
 
         const insert = function (storeName) {
-            return function (object, callback, options) {
+            function insertImpl(object, callback, options) {
                 object = Object.assign({}, object);
-                setItem(dbName, storeName, object, function (error, result) {
+                return setItem(dbName, storeName, object, function (error, result) {
                     if (callback) callback(error, result);
                 }, options);
+            }
+
+            return function (object, callback, options) {
+                if (callback) return insertImpl(object, callback, options);
+                return new Promise((resolve, reject) => {
+                    insertImpl(object, (error, result) => error ? reject(error) : resolve(result), options);
+                })
             }
         }
 
         const remove = function (storeName) {
-            return function (object, options, callback) {
+            function removeImpl(object, options, callback) {
                 object = Object.assign({}, object);
                 if (Object.keys(object).length === 0 && options.multi === true) {
-                    clearStore(dbName, storeName, {}, function (error, result) {
+                    return clearStore(dbName, storeName, {}, function (error, result) {
                         if (callback) callback(error, (result ? 1 : 0), result);
                     });
                 } else if (object._id) {
-                    deleteItem(dbName, storeName, object._id, function (error, result) {
+                    return deleteItem(dbName, storeName, object._id, function (error, result) {
                         if (callback) callback(error, (result ? 1 : 0), result);
                     });
                 } else {
-                    getItems(dbName, storeName, object, function (error, documents) {
+                    return getItems(dbName, storeName, object, function (error, documents) {
                         if (error && callback) return callback(error);
                         if (documents.length > 0) {
                             if (options.multi === true) {
@@ -900,9 +957,17 @@ export default function (inWorker = false, buffer = [], cachelock = []) {
                     });
                 }
             }
+
+            return function (object, options, callback) {
+                if (callback) return removeImpl(object, options, callback);
+                return new Promise((resolve, reject) => {
+                    removeImpl(object, options, (error, result) => error ? reject(error) : resolve(result));
+                })
+            }
         }
 
         const methods = {};
+
         for (const storeName of Object.keys(stores)) {
             methods[storeName] = {
                 update: update(storeName),
@@ -911,6 +976,11 @@ export default function (inWorker = false, buffer = [], cachelock = []) {
                 remove: remove(storeName)
             }
         }
+
+        if (initIndexDbPromise) {
+            return initIndexDbPromise.then(r => methods);
+        }
+
         return methods;
     }
 
@@ -920,6 +990,7 @@ export default function (inWorker = false, buffer = [], cachelock = []) {
         setItems: setItems,
         getItem: getItem,
         getItems: getItems,
-        deleteItem: deleteItem
+        deleteItem: deleteItem,
+        clearStore: clearStore
     }
 };
